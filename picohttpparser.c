@@ -110,7 +110,7 @@ static const char *findchar_fast(const char *buf, const char *buf_end, const cha
 
         size_t left = (buf_end - buf) & ~15;
         do {
-            __m128i b16 = _mm_loadu_si128((void *)buf);
+            __m128i b16 = _mm_loadu_si128((const __m128i *)buf);
             int r = _mm_cmpestri(ranges16, ranges_size, b16, 16, _SIDD_LEAST_SIGNIFICANT | _SIDD_CMP_RANGES | _SIDD_UBYTE_OPS);
             if (unlikely(r != 16)) {
                 buf += r;
@@ -282,14 +282,14 @@ static const char *parse_headers(const char *buf, const char *buf_end, struct ph
             /* parsing name, but do not discard SP before colon, see
              * http://www.mozilla.org/security/announce/2006/mfsa2006-33.html */
             headers[*num_headers].name = buf;
-            static const char ranges1[] __attribute__((aligned(16))) = "\x00 "  /* control chars and up to SP */
-                                                                       "\"\""   /* 0x22 */
-                                                                       "()"     /* 0x28,0x29 */
-                                                                       ",,"     /* 0x2c */
-                                                                       "//"     /* 0x2f */
-                                                                       ":@"     /* 0x3a-0x40 */
-                                                                       "[]"     /* 0x5b-0x5d */
-                                                                       "{\377"; /* 0x7b-0xff */
+            static const char ALIGNED(16) ranges1[] = "\x00 "  /* control chars and up to SP */
+                                                      "\"\""   /* 0x22 */
+                                                      "()"     /* 0x28,0x29 */
+                                                      ",,"     /* 0x2c */
+                                                      "//"     /* 0x2f */
+                                                      ":@"     /* 0x3a-0x40 */
+                                                      "[]"     /* 0x5b-0x5d */
+                                                      "{\377"; /* 0x7b-0xff */
             int found;
             buf = findchar_fast(buf, buf_end, ranges1, sizeof(ranges1) - 1, &found);
             if (!found) {
