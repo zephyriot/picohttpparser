@@ -114,6 +114,9 @@ static void test_request(void)
     PARSE("GET /hoge HTTP/1.0\r\n\r", strlen("GET /hoge HTTP/1.0\r\n\r") - 1, -2, "slowloris (incomplete)");
     PARSE("GET /hoge HTTP/1.0\r\n\r\n", strlen("GET /hoge HTTP/1.0\r\n\r\n") - 1, 0, "slowloris (complete)");
 
+    PARSE(" / HTTP/1.0\r\n\r\n", 0, -1, "empty method");
+    PARSE("GET  HTTP/1.0\r\n\r\n", 0, -1, "empty request-target");
+
     PARSE("GET / HTTP/1.0\r\n:a\r\n\r\n", 0, -1, "empty header name");
     PARSE("GET / HTTP/1.0\r\n :a\r\n\r\n", 0, -1, "header name (space only)");
 
@@ -140,6 +143,11 @@ static void test_request(void)
 
     PARSE("GET / HTTP/1.0\r\n\x7b: 1\r\n\r\n", 0, -1, "disallow {");
 
+    PARSE("GET / HTTP/1.0\r\nfoo: a \t \r\n\r\n", 0, 0, "exclude leading and trailing spaces in header value");
+    ok(bufis(headers[0].value, headers[0].value_len, "a"));
+
+    PARSE("GET   /   HTTP/1.0\r\n\r\n", 0, 0, "accept multiple spaces between tokens");
+
 #undef PARSE
 }
 
@@ -163,7 +171,7 @@ static void test_response(void)
     PARSE("HTTP/1.0 200 OK\r\n\r\n", 0, 0, "simple");
     ok(num_headers == 0);
     ok(status == 200);
-    ok(minor_version = 1);
+    ok(minor_version == 0);
     ok(bufis(msg, msg_len, "OK"));
 
     PARSE("HTTP/1.0 200 OK\r\n\r", 0, -2, "partial");
@@ -229,6 +237,17 @@ static void test_response(void)
     PARSE("HTTP/1. 200 OK\r\n\r\n", 0, -1, "invalid http version");
     PARSE("HTTP/1.2z 200 OK\r\n\r\n", 0, -1, "invalid http version 2");
     PARSE("HTTP/1.1  OK\r\n\r\n", 0, -1, "no status code");
+
+    PARSE("HTTP/1.1 200\r\n\r\n", 0, 0, "accept missing trailing whitespace in status-line");
+    ok(bufis(msg, msg_len, ""));
+    PARSE("HTTP/1.1 200X\r\n\r\n", 0, -1, "garbage after status 1");
+    PARSE("HTTP/1.1 200X \r\n\r\n", 0, -1, "garbage after status 2");
+    PARSE("HTTP/1.1 200X OK\r\n\r\n", 0, -1, "garbage after status 3");
+
+    PARSE("HTTP/1.1 200 OK\r\nbar: \t b\t \t\r\n\r\n", 0, 0, "exclude leading and trailing spaces in header value");
+    ok(bufis(headers[0].value, headers[0].value_len, "b"));
+
+    PARSE("HTTP/1.1   200   OK\r\n\r\n", 0, 0, "accept multiple spaces between tokens");
 
 #undef PARSE
 }
